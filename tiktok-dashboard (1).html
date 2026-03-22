@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TK 数据雷达</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+:root[data-theme="dark"] {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #1a1a24;
+  --border: #2a2a3a;
+  --accent: #fe2c55;
+  --accent2: #25f4ee;
+  --text: #e8e8f0;
+  --text-dim: #6b6b8a;
+  --text-muted: #3a3a52;
+  --row-hover: #1e1e2e;
+  --overlay: rgba(0,0,0,0.75);
+  --warning: #ffbe0b;
+  --grid: rgba(37,244,238,0.03);
+}
+:root[data-theme="light"] {
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface2: #f0f0f5;
+  --border: #dcdce8;
+  --accent: #fe2c55;
+  --accent2: #0aada8;
+  --text: #0d0d1a;
+  --text-dim: #6b6b8a;
+  --text-muted: #b0b0c8;
+  --row-hover: #f8f8ff;
+  --overlay: rgba(0,0,0,0.40);
+  --warning: #b07d00;
+  --grid: rgba(10,173,168,0.04);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:13px;transition:background .25s,color .25s;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;}
+
+/* Header */
+header{display:flex;align-items:center;justify-content:space-between;padding:13px 26px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;transition:background .25s,border-color .25s;}
+.logo{display:flex;align-items:center;gap:10px;font-family:'Space Mono',monospace;font-size:15px;font-weight:700;}
+.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.logo em{color:var(--accent2);font-style:normal;}
+.hdr-r{display:flex;gap:8px;align-items:center;}
+
+.status-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(37,244,238,0.08);border:1px solid rgba(37,244,238,0.2);font-size:11px;color:var(--accent2);font-family:'Space Mono',monospace;}
+[data-theme="light"] .status-pill{background:rgba(10,173,168,0.08);border-color:rgba(10,173,168,0.2);}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+
+/* Theme toggle */
+.theme-toggle{width:52px;height:28px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;position:relative;display:flex;align-items:center;padding:0 5px;justify-content:space-between;transition:background .25s,border-color .25s;}
+.tt-knob{width:20px;height:20px;border-radius:50%;background:var(--accent2);position:absolute;left:4px;transition:transform .25s;}
+[data-theme="light"] .tt-knob{transform:translateX(24px);}
+.tt-icon{font-size:11px;line-height:1;z-index:1;}
+
+/* Buttons */
+.btn{padding:8px 15px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-family:'Noto Sans SC',sans-serif;font-size:13px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:5px;background:var(--surface2);color:var(--text);}
+.btn:hover{border-color:var(--accent2);color:var(--accent2);}
+.btn.p{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn.p:hover{background:#ff4060;border-color:#ff4060;color:#fff;}
+.btn.s{background:rgba(37,244,238,0.08);color:var(--accent2);border-color:rgba(37,244,238,0.3);}
+[data-theme="light"] .btn.s{background:rgba(10,173,168,0.08);border-color:rgba(10,173,168,0.3);}
+.btn.s:hover{background:rgba(37,244,238,0.18);}
+.btn.ex{border-color:rgba(37,244,238,0.3);}
+.btn.ex:hover{background:rgba(37,244,238,0.1);color:var(--accent2);border-color:var(--accent2);}
+.btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none;}
+
+/* Main */
+.main{padding:20px 26px;flex:1;}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .15s;}
+.sc:hover{border-color:var(--accent2);}
+.sl{font-size:11px;color:var(--text-dim);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
+.sv{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;}
+.sv.t{color:var(--accent2);}
+.sv.r{color:var(--accent);}
+
+/* Controls */
+.ctrl{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.sw{position:relative;flex:1;min-width:200px;}
+.sw svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none;}
+.sw input{width:100%;padding:8px 12px 8px 32px;}
+
+input[type=text],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:13px;outline:none;transition:border-color .15s;padding:8px 12px;}
+input[type=text]:focus,input[type=number]:focus,select:focus,textarea:focus{border-color:var(--accent2);}
+input::placeholder{color:var(--text-muted);}
+select option{background:var(--surface);color:var(--text);}
+
+/* Progress */
+.prog{height:3px;background:var(--border);border-radius:2px;margin-bottom:14px;overflow:hidden;display:none;}
+.prog.on{display:block;}
+.prog-f{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s;}
+
+/* Table */
+.tw{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.th{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.tt{font-family:'Space Mono',monospace;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;}
+.ta{display:flex;gap:6px;}
+.ta .btn{padding:4px 10px;font-size:11px;}
+.ox{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;min-width:860px;}
+thead tr{background:var(--surface2);border-bottom:1px solid var(--border);}
+th{padding:9px 12px;text-align:left;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;font-weight:500;white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s;}
+th:hover{color:var(--accent2);}
+th.ns{cursor:default;}
+th.ns:hover{color:var(--text-dim);}
+td{padding:10px 12px;border-bottom:1px solid rgba(128,128,160,0.08);vertical-align:middle;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tbody tr{transition:background .12s;cursor:pointer;}
+tbody tr:hover{background:var(--row-hover);}
+tbody tr.sel{background:rgba(254,44,85,0.05);}
+.pb{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(37,244,238,0.08);border:1px solid rgba(37,244,238,0.2);color:var(--accent2);}
+[data-theme="light"] .pb{background:rgba(10,173,168,0.08);border-color:rgba(10,173,168,0.2);}
+.un{font-family:'Space Mono',monospace;font-size:12px;}
+.nm{font-family:'Space Mono',monospace;font-size:12px;color:var(--text-dim);}
+.nm.big{color:var(--text);font-weight:700;}
+.nm.z{color:var(--text-muted);}
+.bdg{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-family:'Space Mono',monospace;}
+.bok{background:rgba(37,244,238,0.1);color:var(--accent2);}
+[data-theme="light"] .bok{background:rgba(10,173,168,0.1);}
+.berr{background:rgba(254,44,85,0.1);color:var(--accent);}
+.bwait{background:rgba(128,128,160,0.1);color:var(--text-muted);}
+.bload{background:rgba(255,190,11,0.1);color:var(--warning);}
+.tm{font-size:11px;color:var(--text-muted);font-family:'Space Mono',monospace;}
+input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;}
+.bi{padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;font-size:12px;transition:all .12s;margin-right:3px;}
+.bi:hover{border-color:var(--accent2);color:var(--accent2);}
+.bi.d:hover{border-color:var(--accent);color:var(--accent);}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sp{display:inline-block;width:10px;height:10px;border:1.5px solid rgba(255,190,11,.3);border-top-color:var(--warning);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:4px;}
+.empty{text-align:center;padding:50px 20px;color:var(--text-muted);}
+.empty .ei{font-size:34px;margin-bottom:10px;}
+.empty p{font-size:13px;line-height:1.8;}
+
+/* ====== MODAL ====== */
+.overlay{
+  position:fixed;
+  inset:0;
+  background:var(--overlay);
+  z-index:200;
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+.overlay.open{display:flex;}
+.modal{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:24px 26px;
+  width:460px;
+  max-width:94vw;
+  max-height:88vh;
+  overflow-y:auto;
+  position:relative;
+  z-index:201;
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
+.modal h3{font-family:'Space Mono',monospace;font-size:13px;margin-bottom:16px;color:var(--accent2);}
+.fg{margin-bottom:13px;}
+.fg label{display:block;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.fg input,.fg select,.fg textarea{width:100%;}
+.fg textarea{resize:vertical;min-height:88px;}
+.ib{padding:10px 13px;background:rgba(37,244,238,0.05);border:1px solid rgba(37,244,238,0.15);border-radius:8px;font-size:12px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;}
+[data-theme="light"] .ib{background:rgba(10,173,168,0.05);border-color:rgba(10,173,168,0.15);}
+.ib strong{color:var(--accent2);}
+.mf{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+
+/* Toast */
+.toasts{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px;}
+.toast{padding:10px 15px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:13px;color:var(--text);animation:tin .3s ease;max-width:280px;}
+.toast.s{border-color:var(--accent2);color:var(--accent2);}
+.toast.e{border-color:var(--accent);color:var(--accent);}
+@keyframes tin{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+footer{padding:12px 26px;border-top:1px solid var(--border);display:flex;justify-content:space-between;}
+.fn{font-size:11px;color:var(--text-muted);font-family:'Space Mono',monospace;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">♪</div>
+    TK<em>数据</em>雷达
+  </div>
+  <div class="hdr-r">
+    <div class="status-pill"><div class="dot"></div>系统就绪</div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="切换明暗">
+      <span class="tt-icon">🌙</span>
+      <div class="tt-knob"></div>
+      <span class="tt-icon">☀</span>
+    </button>
+    <button class="btn" id="cfg-btn">⚙ API配置</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="stats">
+    <div class="sc"><div class="sl">监控账号</div><div class="sv t" id="s1">0</div></div>
+    <div class="sc"><div class="sl">已选中</div><div class="sv" id="s2">0</div></div>
+    <div class="sc"><div class="sl">总播放量</div><div class="sv" id="s3">0</div></div>
+    <div class="sc"><div class="sl">总粉丝数</div><div class="sv" id="s4">0</div></div>
+    <div class="sc"><div class="sl">总点赞数</div><div class="sv r" id="s5">0</div></div>
+    <div class="sc"><div class="sl">已采集</div><div class="sv t" id="s6">0</div></div>
+  </div>
+
+  <div class="ctrl">
+    <div class="sw">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="q" placeholder="搜索用户名..." oninput="render()">
+    </div>
+    <input type="text" id="ai" placeholder="@用户名 或 TikTok链接" style="width:215px" onkeydown="if(event.key==='Enter')addUser()">
+    <button class="btn p" onclick="addUser()">＋ 添加</button>
+    <button class="btn" id="batch-btn">批量导入</button>
+    <button class="btn s" id="fetch-btn" onclick="fetchSelected()">▶ 抓取选中</button>
+    <button class="btn ex" onclick="exportCSV()">↓ 导出CSV</button>
+  </div>
+
+  <div class="prog" id="prog"><div class="prog-f" id="pf"></div></div>
+
+  <div class="tw">
+    <div class="th">
+      <span class="tt">账号数据列表</span>
+      <div class="ta">
+        <button class="btn" onclick="selectAll()">全选</button>
+        <button class="btn" onclick="deselectAll()">取消</button>
+        <button class="btn" onclick="fetchAll()">抓取全部</button>
+      </div>
+    </div>
+    <div class="ox">
+      <table>
+        <thead><tr>
+          <th class="ns" style="width:34px"><input type="checkbox" id="ca" onchange="toggleAll(this)"></th>
+          <th class="ns">平台</th>
+          <th onclick="srt('username')">用户名</th>
+          <th onclick="srt('followers')">粉丝数</th>
+          <th onclick="srt('following')">关注数</th>
+          <th onclick="srt('likes')">总点赞</th>
+          <th onclick="srt('videos')">视频数</th>
+          <th onclick="srt('views')">总播放量</th>
+          <th onclick="srt('comments')">总评论</th>
+          <th onclick="srt('shares')">总分享</th>
+          <th class="ns">状态</th>
+          <th class="ns">更新时间</th>
+          <th class="ns">操作</th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span class="fn">TK数据雷达 v1.1</span>
+  <span class="fn" id="ft"></span>
+</footer>
+</div>
+
+<!-- CONFIG MODAL -->
+<div class="overlay" id="cfg-ov">
+  <div class="modal">
+    <h3>⚙ API 配置</h3>
+    <div class="ib">
+      <strong>三种数据模式：</strong><br>
+      1. <strong>模拟演示</strong> — 随机数据，无需任何 Key（默认）<br>
+      2. <strong>RapidAPI</strong> — 对接 tiktok-scraper7，需要 Key<br>
+      3. <strong>自建代理</strong> — 填入你自己的抓取服务地址
+    </div>
+    <div class="fg">
+      <label>数据源模式</label>
+      <select id="cm" onchange="toggleCfg()">
+        <option value="demo">模拟演示（无需配置）</option>
+        <option value="rapidapi">RapidAPI TikTok API</option>
+        <option value="proxy">自建代理服务</option>
+      </select>
+    </div>
+    <div id="cx">
+      <div class="fg">
+        <label>API Key / Token</label>
+        <input type="text" id="ck" placeholder="粘贴你的 API Key">
+      </div>
+      <div class="fg" id="cpg">
+        <label>代理服务地址</label>
+        <input type="text" id="cp" placeholder="https://your-proxy.com/api">
+      </div>
+      <div class="fg">
+        <label>请求延迟 (ms)</label>
+        <input type="number" id="cd" value="1500" min="500" max="10000">
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn" id="cfg-cancel">取消</button>
+      <button class="btn p" id="cfg-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- BATCH MODAL -->
+<div class="overlay" id="batch-ov">
+  <div class="modal">
+    <h3>📋 批量导入</h3>
+    <div class="fg">
+      <label>每行一个（@用户名 或 完整链接）</label>
+      <textarea id="bi" placeholder="@username1&#10;@username2&#10;https://www.tiktok.com/@username3"></textarea>
+    </div>
+    <div class="mf">
+      <button class="btn" id="batch-cancel">取消</button>
+      <button class="btn p" id="batch-ok">导入</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="ts"></div>
+
+<script>
+var accs=[], cfg={mode:'demo',key:'',proxy:'',delay:1500}, sk=null, sd=-1;
+
+// Load
+(function(){
+  try{var x=localStorage.getItem('tk_a');if(x)accs=JSON.parse(x);}catch(e){}
+  try{var y=localStorage.getItem('tk_c');if(y)cfg=Object.assign(cfg,JSON.parse(y));}catch(e){}
+  var th=localStorage.getItem('tk_th')||'dark';
+  document.documentElement.setAttribute('data-theme',th);
+  if(!accs.length){['charlidamelio','addisonre','bellapoarch'].forEach(function(u){accs.push(mk(u));});sv();}
+  render();stats();
+  setInterval(function(){document.getElementById('ft').textContent=new Date().toLocaleString('zh-CN');},1000);
+})();
+
+function mk(u){return{id:Date.now()+Math.random(),username:u,followers:null,following:null,likes:null,videos:null,views:null,comments:null,shares:null,status:'pending',updatedAt:null,sel:false};}
+function sv(){localStorage.setItem('tk_a',JSON.stringify(accs));}
+
+// Theme
+function toggleTheme(){
+  var t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('tk_th',t);
+}
+
+// Modal — using addEventListener to avoid inline onclick issues
+var cfgOv=document.getElementById('cfg-ov');
+var batchOv=document.getElementById('batch-ov');
+
+document.getElementById('cfg-btn').addEventListener('click',function(){
+  document.getElementById('cm').value=cfg.mode;
+  document.getElementById('ck').value=cfg.key;
+  document.getElementById('cp').value=cfg.proxy;
+  document.getElementById('cd').value=cfg.delay;
+  toggleCfg();
+  cfgOv.classList.add('open');
+});
+document.getElementById('cfg-cancel').addEventListener('click',function(){cfgOv.classList.remove('open');});
+document.getElementById('cfg-save').addEventListener('click',function(){
+  cfg.mode=document.getElementById('cm').value;
+  cfg.key=document.getElementById('ck').value;
+  cfg.proxy=document.getElementById('cp').value;
+  cfg.delay=parseInt(document.getElementById('cd').value)||1500;
+  localStorage.setItem('tk_c',JSON.stringify(cfg));
+  cfgOv.classList.remove('open');
+  toast('配置已保存','s');
+});
+cfgOv.addEventListener('click',function(e){if(e.target===cfgOv)cfgOv.classList.remove('open');});
+
+document.getElementById('batch-btn').addEventListener('click',function(){batchOv.classList.add('open');});
+document.getElementById('batch-cancel').addEventListener('click',function(){batchOv.classList.remove('open');});
+document.getElementById('batch-ok').addEventListener('click',importBatch);
+batchOv.addEventListener('click',function(e){if(e.target===batchOv)batchOv.classList.remove('open');});
+
+function toggleCfg(){
+  var m=document.getElementById('cm').value;
+  document.getElementById('cx').style.display=m==='demo'?'none':'block';
+  document.getElementById('cpg').style.display=m==='proxy'?'block':'none';
+}
+
+// Parse
+function pu(s){
+  s=s.trim();
+  var m=s.match(/tiktok\.com\/@([^/?&]+)/i);
+  if(m)return m[1];
+  if(s.startsWith('@'))return s.slice(1);
+  return s;
+}
+
+// Add
+function addUser(){
+  var v=document.getElementById('ai').value.trim();
+  if(!v){toast('请输入用户名','e');return;}
+  var u=pu(v);
+  if(!u){toast('无效格式','e');return;}
+  if(accs.find(function(a){return a.username.toLowerCase()===u.toLowerCase();})){toast('@'+u+' 已存在','e');return;}
+  accs.push(mk(u));
+  document.getElementById('ai').value='';
+  sv();render();stats();toast('已添加 @'+u,'s');
+}
+
+function importBatch(){
+  var lines=document.getElementById('bi').value.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  var n=0;
+  lines.forEach(function(l){
+    var u=pu(l);if(!u)return;
+    if(accs.find(function(a){return a.username.toLowerCase()===u.toLowerCase();}))return;
+    accs.push(mk(u));n++;
+  });
+  document.getElementById('bi').value='';
+  batchOv.classList.remove('open');
+  sv();render();stats();toast('导入 '+n+' 个账号','s');
+}
+
+// Fetch
+function fetchSelected(){
+  var t=accs.filter(function(a){return a.sel;});
+  if(!t.length){toast('请先勾选账号','e');return;}
+  doFetch(t);
+}
+function fetchAll(){
+  if(!accs.length){toast('还没有账号','e');return;}
+  doFetch(accs.slice());
+}
+function fetchOne(id){
+  var a=accs.find(function(x){return x.id===id;});
+  if(a)doFetch([a]);
+}
+
+function doFetch(targets){
+  var btn=document.getElementById('fetch-btn');
+  btn.disabled=true;btn.textContent='⏳ 抓取中...';
+  showP();var i=0;
+  function next(){
+    if(i>=targets.length){
+      btn.disabled=false;btn.textContent='▶ 抓取选中';hideP();
+      toast('完成！共 '+targets.length+' 个','s');return;
+    }
+    var a=targets[i];a.status='loading';render();setP(i/targets.length*100);
+    getD(a.username,function(d,err){
+      if(err)a.status='error';
+      else{Object.assign(a,d);a.status='ok';a.updatedAt=new Date().toLocaleString('zh-CN');}
+      i++;setP(i/targets.length*100);sv();render();stats();
+      setTimeout(next,i<targets.length?cfg.delay:0);
+    });
+  }
+  next();
+}
+
+function getD(u,cb){
+  if(cfg.mode==='demo'){
+    setTimeout(function(){
+      var f=Math.floor(Math.random()*5e6)+1000,v=Math.floor(Math.random()*500)+10;
+      cb({followers:f,following:Math.floor(Math.random()*1000)+50,
+        likes:Math.floor(f*(Math.random()*50+10)),videos:v,
+        views:Math.floor(f*v*(Math.random()*3+.5)),
+        comments:Math.floor(Math.random()*5e5),
+        shares:Math.floor(Math.random()*2e5)});
+    },700+Math.random()*600);
+  }else if(cfg.mode==='rapidapi'){
+    fetch('https://tiktok-scraper7.p.rapidapi.com/user/info?unique_id='+encodeURIComponent(u),{
+      headers:{'X-RapidAPI-Key':cfg.key,'X-RapidAPI-Host':'tiktok-scraper7.p.rapidapi.com'}
+    }).then(function(r){return r.json();}).then(function(j){
+      var s=(j.data&&j.data.stats)||(j.userInfo&&j.userInfo.stats)||{};
+      cb({followers:s.followerCount||0,following:s.followingCount||0,likes:s.heartCount||0,videos:s.videoCount||0,views:s.playCount||0,comments:s.commentCount||0,shares:s.shareCount||0});
+    }).catch(function(){cb(null,true);});
+  }else{
+    fetch(cfg.proxy+'?username='+encodeURIComponent(u),{headers:{'Authorization':'Bearer '+cfg.key}})
+    .then(function(r){return r.json();}).then(function(d){cb(d);}).catch(function(){cb(null,true);});
+  }
+}
+
+// Render
+function fmt(n){
+  if(n==null)return '<span class="nm z">—</span>';
+  var s;
+  if(n>=1e8)s=(n/1e8).toFixed(1)+'亿';
+  else if(n>=1e4)s=(n/1e4).toFixed(1)+'万';
+  else s=n.toLocaleString();
+  return '<span class="nm'+(n>1e4?' big':'')+'">'+s+'</span>';
+}
+
+function render(){
+  var q=document.getElementById('q').value.toLowerCase();
+  var data=accs.filter(function(a){return !q||a.username.toLowerCase().includes(q);});
+  if(sk){data.sort(function(a,b){
+    var av=a[sk]!=null?a[sk]:-1,bv=b[sk]!=null?b[sk]:-1;
+    if(typeof av==='string')return av.localeCompare(bv)*sd;
+    return(av-bv)*sd;
+  });}
+  var tb=document.getElementById('tb');
+  if(!data.length){
+    tb.innerHTML='<tr><td colspan="13"><div class="empty"><div class="ei">📊</div><p>'+(q?'没有匹配结果':'还没有监控账号<br>在上方输入框添加 TikTok 用户名')+'</p></div></td></tr>';
+    return;
+  }
+  tb.innerHTML=data.map(function(a){
+    var st=a.status==='loading'
+      ?'<span class="bdg bload"><span class="sp"></span>抓取中</span>'
+      :a.status==='ok'?'<span class="bdg bok">✓ 正常</span>'
+      :a.status==='error'?'<span class="bdg berr">✗ 失败</span>'
+      :'<span class="bdg bwait">待抓取</span>';
+    return '<tr class="'+(a.sel?'sel':'')+'" onclick="rc('+a.id+')">'+
+      '<td onclick="event.stopPropagation()"><input type="checkbox" '+(a.sel?'checked':'')+' onchange="cc('+a.id+',this)"></td>'+
+      '<td><span class="pb">♪ TikTok</span></td>'+
+      '<td><span class="un">@'+a.username+'</span></td>'+
+      '<td>'+fmt(a.followers)+'</td>'+
+      '<td>'+fmt(a.following)+'</td>'+
+      '<td>'+fmt(a.likes)+'</td>'+
+      '<td>'+fmt(a.videos)+'</td>'+
+      '<td>'+fmt(a.views)+'</td>'+
+      '<td>'+fmt(a.comments)+'</td>'+
+      '<td>'+fmt(a.shares)+'</td>'+
+      '<td>'+st+'</td>'+
+      '<td><span class="tm">'+(a.updatedAt||'—')+'</span></td>'+
+      '<td onclick="event.stopPropagation()">'+
+        '<button class="bi" onclick="fetchOne('+a.id+')" title="刷新">↻</button>'+
+        '<button class="bi d" onclick="del('+a.id+')" title="删除">✕</button>'+
+      '</td></tr>';
+  }).join('');
+}
+
+function rc(id){var a=accs.find(function(x){return x.id===id;});if(a){a.sel=!a.sel;render();stats();}}
+function cc(id,el){var a=accs.find(function(x){return x.id===id;});if(a){a.sel=el.checked;stats();}}
+function toggleAll(el){accs.forEach(function(a){a.sel=el.checked;});render();stats();}
+function selectAll(){accs.forEach(function(a){a.sel=true;});render();stats();}
+function deselectAll(){accs.forEach(function(a){a.sel=false;});render();stats();}
+function del(id){accs=accs.filter(function(a){return a.id!==id;});sv();render();stats();toast('已删除','s');}
+function srt(k){if(sk===k)sd*=-1;else{sk=k;sd=-1;}render();}
+
+// Stats
+function stats(){
+  var ok=accs.filter(function(a){return a.status==='ok';});
+  document.getElementById('s1').textContent=accs.length;
+  document.getElementById('s2').textContent=accs.filter(function(a){return a.sel;}).length;
+  document.getElementById('s3').textContent=fs(ok.reduce(function(s,a){return s+(a.views||0);},0));
+  document.getElementById('s4').textContent=fs(ok.reduce(function(s,a){return s+(a.followers||0);},0));
+  document.getElementById('s5').textContent=fs(ok.reduce(function(s,a){return s+(a.likes||0);},0));
+  document.getElementById('s6').textContent=ok.length;
+}
+function fs(n){if(n>=1e8)return(n/1e8).toFixed(1)+'亿';if(n>=1e4)return(n/1e4).toFixed(1)+'万';return n.toLocaleString();}
+
+// Progress
+function showP(){document.getElementById('prog').classList.add('on');setP(0);}
+function setP(p){document.getElementById('pf').style.width=p+'%';}
+function hideP(){setTimeout(function(){document.getElementById('prog').classList.remove('on');},600);}
+
+// Export
+function exportCSV(){
+  if(!accs.length){toast('没有数据','e');return;}
+  var h=['用户名','粉丝数','关注数','总点赞','视频数','总播放量','总评论','总分享','状态','更新时间'];
+  var rows=accs.map(function(a){return[a.username,a.followers??'',a.following??'',a.likes??'',a.videos??'',a.views??'',a.comments??'',a.shares??'',a.status,a.updatedAt??''];});
+  var csv=[h].concat(rows).map(function(r){return r.map(function(v){return'"'+v+'"';}).join(',');}).join('\n');
+  var b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='tiktok_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  toast('CSV 导出成功','s');
+}
+
+// Toast
+function toast(msg,type){
+  var el=document.createElement('div');
+  el.className='toast '+(type||'');el.textContent=msg;
+  document.getElementById('ts').appendChild(el);
+  setTimeout(function(){el.remove();},3000);
+}
+</script>
+</body>
+</html>
